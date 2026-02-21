@@ -1,0 +1,26 @@
+# Data files (too large for GitHub)
+PROVEDIt_1-5-Person CSVs Filtered/
+data/processed/
+*.csv
+
+# Model weights
+results/*.pth
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+*.egg-info/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# PDF
+*.pdf
+
+# Extracted text
+electronics-11-00548-v3.txt
+
+# Jupyter
+.ipynb_checkpoints/
