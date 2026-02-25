@@ -1,6 +1,5 @@
 # Data files (too large for GitHub)
 data/processed/
-*.csv
 
 # Model weights
 results/*.pth
