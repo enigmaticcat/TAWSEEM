@@ -36,7 +36,7 @@ def run_scenario(scenario_name, skip_preprocessing=False, skip_cv=False):
     
     # --- Step 2: Prepare PyTorch datasets ---
     print(f"\nPreparing PyTorch datasets...")
-    train_dataset, test_dataset, scaler = prepare_datasets(
+    train_dataset, test_dataset, scaler, train_profile_ids = prepare_datasets(
         df, train_ratio=TRAIN_RATIO, random_seed=RANDOM_SEED
     )
     
@@ -50,7 +50,10 @@ def run_scenario(scenario_name, skip_preprocessing=False, skip_cv=False):
     
     # --- Step 4: Cross-validation ---
     if not skip_cv:
-        cv_accuracies = cross_validate(train_dataset, n_features, device, scenario_name)
+        cv_accuracies = cross_validate(
+            train_dataset, n_features, device, scenario_name,
+            profile_ids=train_profile_ids
+        )
     
     # --- Step 5: Train final model ---
     model, train_metrics, test_metrics, elapsed = train_final_model(

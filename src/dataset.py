@@ -65,7 +65,7 @@ def prepare_datasets(df, train_ratio=0.7, random_seed=42):
         random_seed: random seed for reproducibility
     
     Returns:
-        train_dataset, test_dataset, scaler
+        train_dataset, test_dataset, scaler, train_profile_ids
     """
     np.random.seed(random_seed)
     
@@ -89,6 +89,9 @@ def prepare_datasets(df, train_ratio=0.7, random_seed=42):
     train_df = df[df[profile_col].isin(train_profiles)]
     test_df = df[df[profile_col].isin(test_profiles)]
     
+    # Save profile IDs before scaling (for profile-level CV split)
+    train_profile_ids = train_df[profile_col].values.astype(np.int64)
+    
     # Separate features and labels
     feature_cols = [c for c in df.columns if c != 'NOC']
     
@@ -105,4 +108,4 @@ def prepare_datasets(df, train_ratio=0.7, random_seed=42):
     print(f"  Test:  {len(test_profiles)} profiles, {len(test_dataset)} rows")
     print(f"  Features: {train_dataset.n_features}")
     
-    return train_dataset, test_dataset, train_dataset.scaler
+    return train_dataset, test_dataset, train_dataset.scaler, train_profile_ids
