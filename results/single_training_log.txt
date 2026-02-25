@@ -1,0 +1,75 @@
+
+############################################################
+# TAWSEEM — Scenario: single
+############################################################
+
+Loading preprocessed data from /Users/nguyenthithutam/Desktop/TAWSEEM/data/processed/single_processed.csv
+
+Preparing PyTorch datasets...
+  Train: 545 profiles, 11445 rows
+  Test:  235 profiles, 4935 rows
+  Features: 48
+Using device: mps
+
+==================================================
+Training Final Model
+==================================================
+TAWSEEM MLP Model:
+  Input dim:     48
+  Hidden layers: 15 (64 neurons each)
+  Dropout layers: 7 (rate=0.2)
+  Output classes: 5
+  Total params:  61,701
+  Trainable:     61,701
+  Epoch   1/100: Train Loss=1.3047, Train Acc=0.3703 | Test Loss=1.0009, Test Acc=0.5481
+  Epoch  10/100: Train Loss=0.7316, Train Acc=0.6892 | Test Loss=0.8032, Test Acc=0.6543
+  Epoch  20/100: Train Loss=0.5706, Train Acc=0.7295 | Test Loss=0.7480, Test Acc=0.6573
+  Epoch  30/100: Train Loss=0.5196, Train Acc=0.7533 | Test Loss=0.5966, Test Acc=0.6940
+  Epoch  40/100: Train Loss=0.6149, Train Acc=0.7210 | Test Loss=0.7964, Test Acc=0.6537
+  Epoch  50/100: Train Loss=0.4898, Train Acc=0.7674 | Test Loss=1.1083, Test Acc=0.6411
+  Epoch  60/100: Train Loss=0.4716, Train Acc=0.7682 | Test Loss=1.0305, Test Acc=0.5933
+  Epoch  70/100: Train Loss=0.3779, Train Acc=0.8188 | Test Loss=1.1468, Test Acc=0.6097
+  Epoch  80/100: Train Loss=0.4034, Train Acc=0.8118 | Test Loss=1.1091, Test Acc=0.6116
+  Epoch  90/100: Train Loss=0.3928, Train Acc=0.8321 | Test Loss=1.0645, Test Acc=0.6428
+  Epoch 100/100: Train Loss=0.4097, Train Acc=0.8030 | Test Loss=1.0983, Test Acc=0.5297
+
+Training completed in 831.2 seconds
+
+--- Training Set Metrics ---
+  Accuracy:  0.7591
+  Precision: 0.7836 (macro)
+  Recall:    0.7591 (macro)
+  F1-Score:  0.7557 (macro)
+
+  Per-class metrics:
+  Class         Precision     Recall   F1-Score
+  --------------------------------------------
+  1-Person         0.9996     0.9812     0.9903
+  2-Person         0.8073     0.4723     0.5959
+  3-Person         0.5858     0.8952     0.7081
+  4-Person         0.7024     0.7042     0.7033
+  5-Person         0.8228     0.7427     0.7807
+
+--- Test Set Metrics ---
+  Accuracy:  0.6940
+  Precision: 0.7120 (macro)
+  Recall:    0.6940 (macro)
+  F1-Score:  0.6880 (macro)
+
+  Per-class metrics:
+  Class         Precision     Recall   F1-Score
+  --------------------------------------------
+  1-Person         0.9893     0.9382     0.9631
+  2-Person         0.6738     0.3810     0.4867
+  3-Person         0.5459     0.8501     0.6648
+  4-Person         0.5934     0.5795     0.5864
+  5-Person         0.7574     0.7214     0.7390
+
+Generating plots for Single...
+  Saved: /Users/nguyenthithutam/Desktop/TAWSEEM/results/single_cm_train.png
+  Saved: /Users/nguyenthithutam/Desktop/TAWSEEM/results/single_cm_test.png
+  Saved: /Users/nguyenthithutam/Desktop/TAWSEEM/results/single_prf_train.png
+  Saved: /Users/nguyenthithutam/Desktop/TAWSEEM/results/single_prf_test.png
+  Saved: /Users/nguyenthithutam/Desktop/TAWSEEM/results/single_errors.png
+
+✅ TAWSEEM pipeline completed!

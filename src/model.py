@@ -76,7 +76,7 @@ class TAWSEEM_MLP(nn.Module):
 
 if __name__ == "__main__":
     # Quick test
-    model = TAWSEEM_MLP(input_dim=48)
+    model = TAWSEEM_MLP(input_dim=76)
     model.summary()
     
     # Test forward pass

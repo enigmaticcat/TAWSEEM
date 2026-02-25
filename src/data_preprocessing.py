@@ -1,8 +1,3 @@
-"""
-TAWSEEM Data Preprocessing Pipeline
-10-step pipeline to convert raw PROVEDIt CSV files into model-ready datasets.
-"""
-
 import os
 import re
 import csv
@@ -14,8 +9,8 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from src.config import (
     DATA_RAW_DIR, DATA_PROCESSED_DIR, MULTIPLEX_FOLDERS,
-    MARKERS_TO_REMOVE, SCENARIOS, DYE_ENCODING, MAX_ALLELES,
-    RANDOM_SEED,
+    MARKERS_TO_REMOVE, SCENARIOS, DYE_ENCODING, MULTIPLEX_ENCODING,
+    MAX_ALLELES, RANDOM_SEED,
 )
 
 
@@ -160,7 +155,11 @@ def step4_handle_missing_values(df):
     """
     Step 4: Handle missing values (empty cells).
     
-    - Create binary Missing indicator columns: Missing_1 ... Missing_9
+    Paper Section 4.2.2: "we created a missing indicator column for each
+    column that contains missing values."
+    
+    - Create binary Missing indicator columns for ALL numeric columns:
+      Missing_Allele_1..10, Missing_Size_1..10, Missing_Height_1..10 (30 total)
     - Fill empty cells with the mean of their column
     """
     numeric_cols = []
@@ -170,17 +169,24 @@ def step4_handle_missing_values(df):
             if col in df.columns:
                 numeric_cols.append(col)
     
-    # Create missing indicators (for allele positions)
+    # Create missing indicators for ALL numeric columns (Allele, Size, Height)
+    n_missing_indicators = 0
     for i in range(1, MAX_ALLELES + 1):
-        col = f'Allele {i}'
-        if col in df.columns:
-            # Missing = all three (allele, size, height) are empty
-            allele_missing = df[col].isna() | (df[col] == '') | (df[col] == '0')
-            size_missing = df[f'Size {i}'].isna() if f'Size {i}' in df.columns else True
-            height_missing = df[f'Height {i}'].isna() if f'Height {i}' in df.columns else True
-            # Missing indicator: allele is empty/NaN AND was not OL
-            ol_indicator = df[f'OL_ind_{i}'] if f'OL_ind_{i}' in df.columns else 0
-            df[f'Missing_{i}'] = ((df[col].isna() | (df[col] == '')) & (ol_indicator == 0)).astype(int)
+        for prefix in ['Allele', 'Size', 'Height']:
+            col = f'{prefix} {i}'
+            if col in df.columns:
+                # For Allele: missing = NaN/empty AND not OL
+                if prefix == 'Allele':
+                    ol_indicator = df[f'OL_ind_{i}'] if f'OL_ind_{i}' in df.columns else 0
+                    df[f'Missing_{prefix}_{i}'] = (
+                        (df[col].isna() | (df[col] == '')) & (ol_indicator == 0)
+                    ).astype(int)
+                else:
+                    # For Size/Height: missing = NaN/empty
+                    df[f'Missing_{prefix}_{i}'] = (
+                        df[col].isna() | (df[col] == '')
+                    ).astype(int)
+                n_missing_indicators += 1
     
     # Convert to numeric and fill with mean
     for col in numeric_cols:
@@ -193,7 +199,7 @@ def step4_handle_missing_values(df):
         col_mean = df[col].mean()
         df[col] = df[col].fillna(col_mean)
     
-    print(f"  Step 4: Filled {total_missing} missing values with mean, created {MAX_ALLELES} missing indicators")
+    print(f"  Step 4: Filled {total_missing} missing values with mean, created {n_missing_indicators} missing indicators")
     return df
 
 
@@ -229,6 +235,28 @@ def step7_encode_marker(df, markers_to_keep):
     marker_encoding = {m: i for i, m in enumerate(sorted(markers_to_keep))}
     df['Marker'] = df['Marker'].map(marker_encoding)
     print(f"  Step 7: Encoded {len(marker_encoding)} markers")
+    return df
+
+
+def step7b_encode_multiplex(df):
+    """
+    Step 7b: Encode multiplex column (categorical → numerical).
+    IDPlus28→0, IDPlus29→1, GF29→2, PP16HS32→3
+    """
+    df['multiplex'] = df['multiplex'].map(MULTIPLEX_ENCODING).fillna(-1).astype(int)
+    print(f"  Step 7b: Encoded multiplex values: {MULTIPLEX_ENCODING}")
+    return df
+
+
+def step7c_encode_injection_time(df):
+    """
+    Step 7c: Encode injection_time column (categorical → numerical).
+    Automatically assigns integer labels based on sorted unique values.
+    """
+    unique_times = sorted(df['injection_time'].unique())
+    time_encoding = {t: i for i, t in enumerate(unique_times)}
+    df['injection_time'] = df['injection_time'].map(time_encoding).fillna(-1).astype(int)
+    print(f"  Step 7c: Encoded injection_time values: {time_encoding}")
     return df
 
 
@@ -284,18 +312,28 @@ def step10_finalize_features(df):
     """
     Step 10: Select final feature columns and label.
     
-    Drop Sample File, multiplex, injection_time (metadata columns).
-    Keep only numeric features and NOC label.
+    Final features (75 total + 1 NOC label = 76 columns):
+      - Allele/Size/Height 1-10:           30
+      - OL_ind 1-10 (allele only):         10
+      - Missing_Allele/Size/Height 1-10:   30
+      - Dye, Marker, profile_loci:          3
+      - multiplex, injection_time:          2
+      - NOC (label):                        1
     """
     # Feature columns
     feature_cols = []
+    # Values: Allele, Size, Height 1-10
     for i in range(1, MAX_ALLELES + 1):
         feature_cols.extend([f'Allele {i}', f'Size {i}', f'Height {i}'])
+    # OL indicators (allele only)
     for i in range(1, MAX_ALLELES + 1):
         feature_cols.append(f'OL_ind_{i}')
+    # Missing indicators (Allele + Size + Height)
     for i in range(1, MAX_ALLELES + 1):
-        feature_cols.append(f'Missing_{i}')
-    feature_cols.extend(['Dye', 'Marker', 'profile_loci'])
+        for prefix in ['Allele', 'Size', 'Height']:
+            feature_cols.append(f'Missing_{prefix}_{i}')
+    # Categorical encoded features
+    feature_cols.extend(['Dye', 'Marker', 'profile_loci', 'multiplex', 'injection_time'])
     
     # Only keep existing columns
     feature_cols = [c for c in feature_cols if c in df.columns]
@@ -303,7 +341,7 @@ def step10_finalize_features(df):
     result = df[feature_cols + ['NOC']].copy()
     
     print(f"  Step 10: Final dataset: {result.shape[0]} rows × {len(feature_cols)} features + 1 label")
-    print(f"           Features: {feature_cols}")
+    print(f"           Feature groups: 30 values + 10 OL + 30 missing + 5 categorical = {len(feature_cols)}")
     return result
 
 
@@ -359,6 +397,14 @@ def preprocess_scenario(scenario_name):
     # Step 7: Encode Marker
     print("\n[Step 7] Encoding Marker names...")
     df = step7_encode_marker(df, scenario['markers_to_keep'])
+    
+    # Step 7b: Encode Multiplex
+    print("\n[Step 7b] Encoding Multiplex...")
+    df = step7b_encode_multiplex(df)
+    
+    # Step 7c: Encode Injection Time
+    print("\n[Step 7c] Encoding Injection Time...")
+    df = step7c_encode_injection_time(df)
     
     # Step 8: Create profile_loci
     print("\n[Step 8] Creating profile_loci feature...")

@@ -25,7 +25,7 @@ MULTIPLEX_FOLDERS = {
 # MARKER CONFIGURATIONS (per scenario)
 # ============================================================
 
-# All markers per multiplex (before removal of AMEL/Yindel/DYS391)
+# All markers per multiplex (before removal of AMEL/Yindel)
 MARKERS_GF29 = [
     "AMEL", "CSF1PO", "D10S1248", "D12S391", "D13S317", "D16S539",
     "D18S51", "D19S433", "D1S1656", "D21S11", "D22S1045", "D2S1338",
@@ -45,8 +45,8 @@ MARKERS_PP16HS = [
     "Penta E", "TH01", "TPOX", "vWA",
 ]
 
-# Markers to REMOVE (sex-determining / Y-chromosome)
-MARKERS_TO_REMOVE = {"AMEL", "Yindel", "DYS391"}
+# Markers to REMOVE (paper Section 4.2.4: only AMEL and Yindel)
+MARKERS_TO_REMOVE = {"AMEL", "Yindel"}
 
 # 14 common markers across all 4 multiplexes (including AMEL)
 COMMON_MARKERS_4 = sorted(
@@ -96,10 +96,13 @@ SCENARIOS = {
 # ============================================================
 DYE_ENCODING = {"B": 0, "G": 1, "P": 2, "R": 3, "Y": 4}
 
+# Multiplex encoding (for multi-kit scenarios)
+MULTIPLEX_ENCODING = {"IDPlus28": 0, "IDPlus29": 1, "GF29": 2, "PP16HS32": 3}
+
 # ============================================================
 # PREPROCESSING PARAMETERS
 # ============================================================
-MAX_ALLELES = 9  # Keep Allele 1-9, drop 10-100
+MAX_ALLELES = 10  # Keep Allele 1-10, drop 11-100 (paper Figure 19)
 
 # ============================================================
 # MODEL HYPERPARAMETERS (Table 5 in paper)
