@@ -69,8 +69,8 @@ def prepare_datasets(df, train_ratio=0.7, random_seed=42):
     """
     np.random.seed(random_seed)
     
-    # Get unique profiles and their NOC
-    profile_col = 'profile_loci'
+    # Use 'Sample File' to identify unique profiles
+    profile_col = 'Sample File'
     profiles = df.groupby(profile_col)['NOC'].first()
     
     train_profiles = []
@@ -89,11 +89,13 @@ def prepare_datasets(df, train_ratio=0.7, random_seed=42):
     train_df = df[df[profile_col].isin(train_profiles)]
     test_df = df[df[profile_col].isin(test_profiles)]
     
-    # Save profile IDs before scaling (for profile-level CV split)
-    train_profile_ids = train_df[profile_col].values.astype(np.int64)
+    # Create numeric profile IDs for profile-level CV split
+    unique_train_profiles = train_df[profile_col].unique()
+    profile_id_map = {name: idx for idx, name in enumerate(unique_train_profiles)}
+    train_profile_ids = train_df[profile_col].map(profile_id_map).values.astype(np.int64)
     
-    # Separate features and labels
-    feature_cols = [c for c in df.columns if c != 'NOC']
+    # Separate features and labels (exclude 'Sample File' from features)
+    feature_cols = [c for c in df.columns if c not in ('NOC', 'Sample File')]
     
     X_train = train_df[feature_cols].values.astype(np.float32)
     y_train = train_df['NOC'].values.astype(np.int64)

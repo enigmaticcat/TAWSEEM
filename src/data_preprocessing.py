@@ -264,14 +264,19 @@ def step8_create_profile_loci(df):
     """
     Step 8: Create Profile Loci feature.
     
-    Assigns a unique numeric ID to each profile (sample).
-    All rows from the same sample get the same profile_loci value.
-    """
-    unique_profiles = df['Sample File'].unique()
-    profile_map = {name: idx for idx, name in enumerate(unique_profiles)}
-    df['profile_loci'] = df['Sample File'].map(profile_map)
+    Assigns the index of each locus (marker) within its profile.
+    For a profile with 22 markers, values go from 0 to 21.
+    This tells the model "this is the Nth marker in the profile."
     
-    print(f"  Step 8: Created profile_loci for {len(unique_profiles)} unique profiles")
+    Paper Section 4.2.6: "We created this feature because of its
+    importance in specifying which markers are together."
+    """
+    df = df.copy()
+    df['profile_loci'] = df.groupby('Sample File').cumcount()
+    
+    n_profiles = df['Sample File'].nunique()
+    max_loci = df['profile_loci'].max() + 1
+    print(f"  Step 8: Created profile_loci (0-{max_loci-1}) for {n_profiles} unique profiles")
     return df
 
 
@@ -299,11 +304,10 @@ def step9_balance_dataset(df, target_per_class):
     
     df = df[df['Sample File'].isin(balanced_profiles)].copy()
     
-    # Re-create profile_loci after balancing
-    unique_profiles = df['Sample File'].unique()
-    profile_map = {name: idx for idx, name in enumerate(unique_profiles)}
-    df['profile_loci'] = df['Sample File'].map(profile_map)
+    # Re-create profile_loci after balancing (locus index within each profile)
+    df['profile_loci'] = df.groupby('Sample File').cumcount()
     
+    unique_profiles = df['Sample File'].unique()
     print(f"  Step 9: Balanced to {len(unique_profiles)} profiles, {len(df)} rows")
     return df
 
@@ -319,6 +323,8 @@ def step10_finalize_features(df):
       - Dye, Marker, profile_loci:          3
       - multiplex, injection_time:          2
       - NOC (label):                        1
+    
+    Also keeps 'Sample File' for profile-level splitting (not a feature).
     """
     # Feature columns
     feature_cols = []
@@ -338,7 +344,12 @@ def step10_finalize_features(df):
     # Only keep existing columns
     feature_cols = [c for c in feature_cols if c in df.columns]
     
-    result = df[feature_cols + ['NOC']].copy()
+    # Keep Sample File for profile-level splitting (not a model feature)
+    keep_cols = feature_cols + ['NOC']
+    if 'Sample File' in df.columns:
+        keep_cols.append('Sample File')
+    
+    result = df[keep_cols].copy()
     
     print(f"  Step 10: Final dataset: {result.shape[0]} rows × {len(feature_cols)} features + 1 label")
     print(f"           Feature groups: 30 values + 10 OL + 30 missing + 5 categorical = {len(feature_cols)}")
@@ -428,13 +439,13 @@ def preprocess_scenario(scenario_name):
     print(f"\n{'='*40}")
     print(f"SUMMARY: {scenario['name']}")
     print(f"{'='*40}")
-    print(f"  Profiles: {df['profile_loci'].nunique()}")
+    print(f"  Profiles: {df['Sample File'].nunique()}")
     print(f"  Rows: {len(df)}")
-    print(f"  Features: {df.shape[1] - 1}")
+    print(f"  Features: {df.shape[1] - 2}")  # -2 for NOC and Sample File
     print(f"  NOC distribution:")
     for noc in sorted(df['NOC'].unique()):
         count = (df['NOC'] == noc).sum()
-        profiles = df[df['NOC'] == noc]['profile_loci'].nunique()
+        profiles = df[df['NOC'] == noc]['Sample File'].nunique()
         print(f"    NOC={noc}: {profiles} profiles, {count} rows")
     
     return df
