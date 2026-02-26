@@ -15,6 +15,7 @@ from src.config import DATA_PROCESSED_DIR, RESULTS_DIR, TRAIN_RATIO, RANDOM_SEED
 from src.data_preprocessing import preprocess_scenario
 from src.dataset import prepare_datasets, prepare_profile_datasets
 from src.train import cross_validate, train_final_model
+from src.tree_models import train_tree_models
 from src.evaluate import generate_all_plots, plot_accuracy_comparison
 
 
@@ -48,20 +49,36 @@ def run_scenario(scenario_name, skip_preprocessing=False, skip_cv=False):
                           'cpu')
     print(f"Using device: {device}")
     
-    # --- Step 4: Cross-validation ---
+    # --- Step 4: Cross-validation (MLP) ---
     if not skip_cv:
         cv_accuracies = cross_validate(
             train_dataset, n_features, device, scenario_name,
             profile_ids=train_profile_ids
         )
     
-    # --- Step 5: Train final model ---
+    # --- Step 5: Train final MLP model ---
     model, train_metrics, test_metrics, elapsed = train_final_model(
         train_dataset, test_dataset, n_features, device, scenario_name
     )
     
-    # --- Step 6: Generate plots ---
+    # --- Step 6: Train tree-based models (RF + XGBoost) ---
+    tree_results = train_tree_models(train_dataset, test_dataset, scenario_name)
+    
+    # --- Step 7: Generate plots ---
     generate_all_plots(train_metrics, test_metrics, scenario_name)
+    
+    # Find best model
+    best_tree_name = max(tree_results, key=lambda k: tree_results[k]['test_acc'])
+    best_tree_acc = tree_results[best_tree_name]['test_acc']
+    mlp_acc = test_metrics['accuracy']
+    
+    print(f"\n{'='*50}")
+    print(f"MODEL COMPARISON — {scenario_name}")
+    print(f"{'='*50}")
+    print(f"  MLP:           Test Acc = {mlp_acc:.4f}")
+    for name, res in tree_results.items():
+        marker = " ← BEST" if res['test_acc'] == max(mlp_acc, best_tree_acc) else ""
+        print(f"  {name:15s} Test Acc = {res['test_acc']:.4f} (CV: {res['cv_acc']:.4f} ± {res['cv_std']:.4f}){marker}")
     
     return {
         'train_acc': train_metrics['accuracy'],
@@ -69,6 +86,7 @@ def run_scenario(scenario_name, skip_preprocessing=False, skip_cv=False):
         'train_metrics': train_metrics,
         'test_metrics': test_metrics,
         'elapsed_time': elapsed,
+        'tree_results': tree_results,
     }
 
 

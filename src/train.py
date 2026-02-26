@@ -105,7 +105,7 @@ def cross_validate(train_dataset, n_features, device, scenario_name, profile_ids
         
         model = TAWSEEM_MLP(input_dim=n_features).to(device)
         criterion = nn.CrossEntropyLoss()
-        optimizer = torch.optim.Adam(model.parameters(), lr=LEARNING_RATE)
+        optimizer = torch.optim.Adam(model.parameters(), lr=LEARNING_RATE, weight_decay=1e-4)
         
         for epoch in range(EPOCHS):
             train_loss, train_acc = train_one_epoch(model, train_loader, criterion, optimizer, device)
@@ -146,7 +146,7 @@ def train_final_model(train_dataset, test_dataset, n_features, device, scenario_
     model.summary()
     
     criterion = nn.CrossEntropyLoss()
-    optimizer = torch.optim.Adam(model.parameters(), lr=LEARNING_RATE)
+    optimizer = torch.optim.Adam(model.parameters(), lr=LEARNING_RATE, weight_decay=1e-4)
     
     start_time = time.time()
     
