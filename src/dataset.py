@@ -146,11 +146,22 @@ def prepare_profile_datasets(df, train_ratio=0.7, random_seed=42):
     # Sort for consistent ordering
     df_sorted = df.sort_values([profile_col, 'Marker']).reset_index(drop=True)
     
-    # Check all profiles have same number of markers
+    # Deduplicate: keep only first row per (profile, marker) pair
+    before_dedup = len(df_sorted)
+    df_sorted = df_sorted.drop_duplicates(subset=[profile_col, 'Marker'], keep='first').reset_index(drop=True)
+    if len(df_sorted) < before_dedup:
+        print(f"  Removed {before_dedup - len(df_sorted)} duplicate (profile, marker) rows")
+    
+    # Check markers per profile — keep only profiles with most common count
     markers_per_profile = df_sorted.groupby(profile_col).size()
-    n_markers = markers_per_profile.iloc[0]
-    assert markers_per_profile.nunique() == 1, \
-        f"Not all profiles have same number of markers: {markers_per_profile.value_counts().to_dict()}"
+    n_markers = markers_per_profile.mode().iloc[0]
+    
+    # Filter out profiles that still have different marker counts
+    valid_profiles = markers_per_profile[markers_per_profile == n_markers].index
+    if len(valid_profiles) < len(markers_per_profile):
+        n_removed = len(markers_per_profile) - len(valid_profiles)
+        print(f"  Removed {n_removed} profiles with {markers_per_profile.value_counts().to_dict()} markers (keeping {n_markers})")
+        df_sorted = df_sorted[df_sorted[profile_col].isin(valid_profiles)].reset_index(drop=True)
     
     # Identify column groups
     allele_cols = [f'Allele {i}' for i in range(1, 11) if f'Allele {i}' in df.columns]
