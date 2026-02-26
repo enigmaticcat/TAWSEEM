@@ -1,7 +1,6 @@
 """
 TAWSEEM MLP Model (PyTorch)
-Multilayer Perceptron with 15 hidden layers and 7 dropout layers.
-Architecture matches Table 5 of the paper.
+Multilayer Perceptron for DNA contributor number estimation.
 """
 
 import torch
@@ -16,58 +15,76 @@ class TAWSEEM_MLP(nn.Module):
     """
     Multilayer Perceptron for DNA contributor estimation.
     
-    Architecture (from paper Table 5):
-    - Input layer → 64 neurons
-    - 15 hidden layers (64 neurons each), ReLU activation
-    - 7 dropout layers (rate=0.2), placed every 2 hidden layers
-    - Output layer: 5 classes (softmax)
+    Profile-level architecture (for ~140 aggregated features):
+    - Input -> 256 -> BN -> ReLU -> Dropout(0.4)
+    - 256 -> 128 -> BN -> ReLU -> Dropout(0.4)
+    - 128 -> 64 -> BN -> ReLU -> Dropout(0.3)
+    - 64 -> 32 -> BN -> ReLU -> Dropout(0.3)
+    - 32 -> 5 (output)
     
-    Structure:
-        Input → [Linear→ReLU] → [Linear→ReLU, Linear→ReLU, Dropout] × 7 → Linear → Output
-        = 1 + 14 hidden layers = 15 total, with 7 dropouts
+    Uses BatchNorm + higher dropout for regularization with small datasets.
     """
     
     def __init__(self, input_dim, hidden_dim=HIDDEN_DIM, num_classes=NUM_CLASSES,
                  dropout_rate=DROPOUT_RATE):
         super(TAWSEEM_MLP, self).__init__()
         
-        layers = []
+        self.network = nn.Sequential(
+            # Block 1: Input -> 256
+            nn.Linear(input_dim, 256),
+            nn.BatchNorm1d(256),
+            nn.ReLU(),
+            nn.Dropout(0.4),
+            
+            # Block 2: 256 -> 128
+            nn.Linear(256, 128),
+            nn.BatchNorm1d(128),
+            nn.ReLU(),
+            nn.Dropout(0.4),
+            
+            # Block 3: 128 -> 64
+            nn.Linear(128, 64),
+            nn.BatchNorm1d(64),
+            nn.ReLU(),
+            nn.Dropout(0.3),
+            
+            # Block 4: 64 -> 32
+            nn.Linear(64, 32),
+            nn.BatchNorm1d(32),
+            nn.ReLU(),
+            nn.Dropout(0.3),
+            
+            # Output
+            nn.Linear(32, num_classes),
+        )
         
-        # Input layer → first hidden layer
-        layers.append(nn.Linear(input_dim, hidden_dim))
-        layers.append(nn.ReLU())
-        
-        # 14 more hidden layers organized in 7 blocks of 2 layers + dropout
-        for block in range(7):
-            layers.append(nn.Linear(hidden_dim, hidden_dim))
-            layers.append(nn.ReLU())
-            layers.append(nn.Linear(hidden_dim, hidden_dim))
-            layers.append(nn.ReLU())
-            layers.append(nn.Dropout(dropout_rate))
-        
-        # Output layer
-        layers.append(nn.Linear(hidden_dim, num_classes))
-        
-        self.network = nn.Sequential(*layers)
-        
-        # Count layers for verification
-        linear_layers = sum(1 for l in self.network if isinstance(l, nn.Linear))
-        dropout_layers = sum(1 for l in self.network if isinstance(l, nn.Dropout))
-        
-        self._n_hidden = linear_layers - 1  # exclude output layer
-        self._n_dropout = dropout_layers
         self._input_dim = input_dim
+        self._num_classes = num_classes
+        
+        # Initialize weights
+        self._init_weights()
+    
+    def _init_weights(self):
+        for m in self.modules():
+            if isinstance(m, nn.Linear):
+                nn.init.kaiming_normal_(m.weight, mode='fan_in', nonlinearity='relu')
+                if m.bias is not None:
+                    nn.init.zeros_(m.bias)
     
     def forward(self, x):
         return self.network(x)
     
     def summary(self):
         """Print model summary."""
+        linear_layers = [l for l in self.network if isinstance(l, nn.Linear)]
+        dropout_layers = [l for l in self.network if isinstance(l, nn.Dropout)]
+        
         print(f"TAWSEEM MLP Model:")
         print(f"  Input dim:     {self._input_dim}")
-        print(f"  Hidden layers: {self._n_hidden} ({HIDDEN_DIM} neurons each)")
-        print(f"  Dropout layers: {self._n_dropout} (rate={DROPOUT_RATE})")
-        print(f"  Output classes: {NUM_CLASSES}")
+        print(f"  Architecture:  {' -> '.join([str(self._input_dim)] + [str(l.out_features) for l in linear_layers])}")
+        print(f"  Hidden layers: {len(linear_layers) - 1}")
+        print(f"  Dropout layers: {len(dropout_layers)}")
+        print(f"  Output classes: {self._num_classes}")
         total_params = sum(p.numel() for p in self.parameters())
         trainable = sum(p.numel() for p in self.parameters() if p.requires_grad)
         print(f"  Total params:  {total_params:,}")
@@ -75,12 +92,10 @@ class TAWSEEM_MLP(nn.Module):
 
 
 if __name__ == "__main__":
-    # Quick test
-    model = TAWSEEM_MLP(input_dim=76)
+    model = TAWSEEM_MLP(input_dim=140)
     model.summary()
     
-    # Test forward pass
-    x = torch.randn(30, 48)  # batch_size=30, features=48
+    x = torch.randn(30, 140)
     output = model(x)
     print(f"\n  Input shape:  {x.shape}")
     print(f"  Output shape: {output.shape}")
