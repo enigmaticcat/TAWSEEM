@@ -314,43 +314,36 @@ def step9_balance_dataset(df, target_per_class):
 
 def step10_finalize_features(df):
     """
-    Step 10: Select final feature columns and label (reduced, non-redundant).
+    Step 10: Select final feature columns and label.
     
-    Removed redundant features:
-      - Size 1-10:           redundant with Allele (strong linear correlation)
-      - Missing_Size 1-10:   identical to Missing_Allele (all NaN together)
-      - Missing_Height 1-10: identical to Missing_Allele (all NaN together)
-      - profile_loci:        redundant with Marker encoding
-      - multiplex:           removed if constant (single scenario)
-      - injection_time:      removed if constant (single scenario)
+    Removed only truly problematic features:
+      - profile_loci:   redundant with Marker / causes leakage if unique ID
+      - multiplex:      removed if constant (single scenario)
+      - injection_time: removed if constant (single scenario)
     
-    Final features (32 for single scenario):
-      - Allele 1-10:             10  (allele repeat numbers)
-      - Height 1-10:             10  (peak intensities — most important)
-      - OL_ind 1-10:             10  (out-of-ladder indicators)
-      - Missing_Allele 1-10:     10  (missing value indicators)
-      - Dye, Marker:              2  (categorical)
-      - multiplex, injection_time: 0-2 (only if non-constant)
+    Kept features (~72 for single scenario):
+      - Allele/Size/Height 1-10:         30  (peak data)
+      - OL_ind 1-10:                     10  (out-of-ladder indicators)
+      - Missing_Allele/Size/Height 1-10: 30  (missing value indicators)
+      - Dye, Marker:                      2  (categorical)
+      - multiplex, injection_time:       0-2  (only if non-constant)
     
     Also keeps 'Sample File' for profile-level splitting (not a feature).
     """
     feature_cols = []
     
-    # Allele values 1-10 (indirect NOC info via allele count and spacing)
+    # Values: Allele, Size, Height 1-10
     for i in range(1, MAX_ALLELES + 1):
-        feature_cols.append(f'Allele {i}')
+        feature_cols.extend([f'Allele {i}', f'Size {i}', f'Height {i}'])
     
-    # Height values 1-10 (most important: peak intensity patterns)
-    for i in range(1, MAX_ALLELES + 1):
-        feature_cols.append(f'Height {i}')
-    
-    # OL indicators (important: complex mixtures → more OL)
+    # OL indicators
     for i in range(1, MAX_ALLELES + 1):
         feature_cols.append(f'OL_ind_{i}')
     
-    # Missing indicators — only Allele (Size/Height missing = Allele missing)
+    # Missing indicators (Allele + Size + Height)
     for i in range(1, MAX_ALLELES + 1):
-        feature_cols.append(f'Missing_Allele_{i}')
+        for prefix in ['Allele', 'Size', 'Height']:
+            feature_cols.append(f'Missing_{prefix}_{i}')
     
     # Categorical: always keep Dye and Marker
     feature_cols.extend(['Dye', 'Marker'])
@@ -359,6 +352,8 @@ def step10_finalize_features(df):
     for cat_col in ['multiplex', 'injection_time']:
         if cat_col in df.columns and df[cat_col].nunique() > 1:
             feature_cols.append(cat_col)
+    
+    # NOTE: profile_loci intentionally excluded (redundant with Marker)
     
     # Only keep existing columns
     feature_cols = [c for c in feature_cols if c in df.columns]
@@ -370,7 +365,7 @@ def step10_finalize_features(df):
     
     result = df[keep_cols].copy()
     
-    n_values = sum(1 for c in feature_cols if c.startswith(('Allele ', 'Height ')))
+    n_values = sum(1 for c in feature_cols if c.startswith(('Allele ', 'Size ', 'Height ')))
     n_ol = sum(1 for c in feature_cols if c.startswith('OL_ind'))
     n_missing = sum(1 for c in feature_cols if c.startswith('Missing_'))
     n_cat = len(feature_cols) - n_values - n_ol - n_missing

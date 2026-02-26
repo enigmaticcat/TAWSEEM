@@ -80,99 +80,45 @@ def evaluate(model, dataloader, criterion, device):
 
 def cross_validate(train_dataset, n_features, device, scenario_name, profile_ids=None):
     """
-    Perform 5-fold cross-validation on the training dataset.
-    
-    Splits at the PROFILE level: all rows from the same profile stay in
-    the same fold to prevent data leakage through profile_loci.
-    
-    Args:
-        train_dataset: DNAProfileDataset
-        n_features: number of input features
-        device: torch device
-        scenario_name: name of scenario
-        profile_ids: array of profile IDs per row (for profile-level splitting)
+    Perform 5-fold cross-validation.
     
     Returns: list of fold accuracies
     """
     print(f"\n{'='*50}")
-    print(f"5-Fold Cross-Validation (profile-level split)")
+    print(f"5-Fold Cross-Validation")
     print(f"{'='*50}")
     
     labels = train_dataset.labels.numpy()
     fold_accuracies = []
     
-    if profile_ids is not None:
-        # Profile-level split: group rows by profile, then split profiles
-        unique_profiles = np.unique(profile_ids)
-        profile_labels = np.array([labels[profile_ids == p][0] for p in unique_profiles])
+    skf = StratifiedKFold(n_splits=NUM_CV_FOLDS, shuffle=True, random_state=RANDOM_SEED)
+    
+    for fold, (train_idx, val_idx) in enumerate(skf.split(np.zeros(len(labels)), labels)):
+        print(f"\n--- Fold {fold + 1}/{NUM_CV_FOLDS} ---")
+        print(f"  Train: {len(train_idx)}, Val: {len(val_idx)}")
         
-        skf = StratifiedKFold(n_splits=NUM_CV_FOLDS, shuffle=True, random_state=RANDOM_SEED)
+        train_subset = Subset(train_dataset, train_idx)
+        val_subset = Subset(train_dataset, val_idx)
         
-        for fold, (train_prof_idx, val_prof_idx) in enumerate(skf.split(unique_profiles, profile_labels)):
-            print(f"\n--- Fold {fold + 1}/{NUM_CV_FOLDS} ---")
-            
-            train_profiles = set(unique_profiles[train_prof_idx])
-            val_profiles = set(unique_profiles[val_prof_idx])
-            
-            # Map profile-level split back to row-level indices
-            train_idx = [i for i, p in enumerate(profile_ids) if p in train_profiles]
-            val_idx = [i for i, p in enumerate(profile_ids) if p in val_profiles]
-            
-            print(f"  Profiles: {len(train_profiles)} train, {len(val_profiles)} val")
-            print(f"  Rows: {len(train_idx)} train, {len(val_idx)} val")
-            
-            train_subset = Subset(train_dataset, train_idx)
-            val_subset = Subset(train_dataset, val_idx)
-            
-            train_loader = DataLoader(train_subset, batch_size=BATCH_SIZE, shuffle=True)
-            val_loader = DataLoader(val_subset, batch_size=BATCH_SIZE, shuffle=False)
-            
-            model = TAWSEEM_MLP(input_dim=n_features).to(device)
-            criterion = nn.CrossEntropyLoss()
-            optimizer = torch.optim.Adam(model.parameters(), lr=LEARNING_RATE)
-            
-            for epoch in range(EPOCHS):
-                train_loss, train_acc = train_one_epoch(model, train_loader, criterion, optimizer, device)
-                
-                if (epoch + 1) % 20 == 0 or epoch == 0:
-                    val_loss, val_acc, _, _ = evaluate(model, val_loader, criterion, device)
-                    print(f"  Epoch {epoch+1:3d}/{EPOCHS}: "
-                          f"Train Loss={train_loss:.4f}, Train Acc={train_acc:.4f} | "
-                          f"Val Loss={val_loss:.4f}, Val Acc={val_acc:.4f}")
-            
-            _, val_acc, val_preds, val_labels = evaluate(model, val_loader, criterion, device)
-            fold_accuracies.append(val_acc)
-            print(f"  Fold {fold + 1} Final Accuracy: {val_acc:.4f}")
-    else:
-        # Fallback: row-level split (not recommended)
-        print("  WARNING: No profile_ids provided, falling back to row-level split")
-        skf = StratifiedKFold(n_splits=NUM_CV_FOLDS, shuffle=True, random_state=RANDOM_SEED)
+        train_loader = DataLoader(train_subset, batch_size=BATCH_SIZE, shuffle=True)
+        val_loader = DataLoader(val_subset, batch_size=BATCH_SIZE, shuffle=False)
         
-        for fold, (train_idx, val_idx) in enumerate(skf.split(np.zeros(len(labels)), labels)):
-            print(f"\n--- Fold {fold + 1}/{NUM_CV_FOLDS} ---")
+        model = TAWSEEM_MLP(input_dim=n_features).to(device)
+        criterion = nn.CrossEntropyLoss()
+        optimizer = torch.optim.Adam(model.parameters(), lr=LEARNING_RATE)
+        
+        for epoch in range(EPOCHS):
+            train_loss, train_acc = train_one_epoch(model, train_loader, criterion, optimizer, device)
             
-            train_subset = Subset(train_dataset, train_idx)
-            val_subset = Subset(train_dataset, val_idx)
-            
-            train_loader = DataLoader(train_subset, batch_size=BATCH_SIZE, shuffle=True)
-            val_loader = DataLoader(val_subset, batch_size=BATCH_SIZE, shuffle=False)
-            
-            model = TAWSEEM_MLP(input_dim=n_features).to(device)
-            criterion = nn.CrossEntropyLoss()
-            optimizer = torch.optim.Adam(model.parameters(), lr=LEARNING_RATE)
-            
-            for epoch in range(EPOCHS):
-                train_loss, train_acc = train_one_epoch(model, train_loader, criterion, optimizer, device)
-                
-                if (epoch + 1) % 20 == 0 or epoch == 0:
-                    val_loss, val_acc, _, _ = evaluate(model, val_loader, criterion, device)
-                    print(f"  Epoch {epoch+1:3d}/{EPOCHS}: "
-                          f"Train Loss={train_loss:.4f}, Train Acc={train_acc:.4f} | "
-                          f"Val Loss={val_loss:.4f}, Val Acc={val_acc:.4f}")
-            
-            _, val_acc, val_preds, val_labels = evaluate(model, val_loader, criterion, device)
-            fold_accuracies.append(val_acc)
-            print(f"  Fold {fold + 1} Final Accuracy: {val_acc:.4f}")
+            if (epoch + 1) % 20 == 0 or epoch == 0:
+                val_loss, val_acc, _, _ = evaluate(model, val_loader, criterion, device)
+                print(f"  Epoch {epoch+1:3d}/{EPOCHS}: "
+                      f"Train Loss={train_loss:.4f}, Acc={train_acc:.4f} | "
+                      f"Val Loss={val_loss:.4f}, Acc={val_acc:.4f}")
+        
+        _, val_acc, _, _ = evaluate(model, val_loader, criterion, device)
+        fold_accuracies.append(val_acc)
+        print(f"  Fold {fold + 1} Final Accuracy: {val_acc:.4f}")
     
     mean_acc = np.mean(fold_accuracies)
     std_acc = np.std(fold_accuracies)
@@ -186,7 +132,7 @@ def train_final_model(train_dataset, test_dataset, n_features, device, scenario_
     """
     Train the final model on the full training set and evaluate on test set.
     
-    Returns: model, train_metrics, test_metrics
+    Returns: model, train_metrics, test_metrics, elapsed_time
     """
     print(f"\n{'='*50}")
     print(f"Training Final Model")
@@ -204,7 +150,6 @@ def train_final_model(train_dataset, test_dataset, n_features, device, scenario_
     
     start_time = time.time()
     
-    # Training loop
     best_test_acc = 0
     for epoch in range(EPOCHS):
         train_loss, train_acc = train_one_epoch(model, train_loader, criterion, optimizer, device)
@@ -212,12 +157,11 @@ def train_final_model(train_dataset, test_dataset, n_features, device, scenario_
         if (epoch + 1) % 10 == 0 or epoch == 0:
             test_loss, test_acc, _, _ = evaluate(model, test_loader, criterion, device)
             print(f"  Epoch {epoch+1:3d}/{EPOCHS}: "
-                  f"Train Loss={train_loss:.4f}, Train Acc={train_acc:.4f} | "
-                  f"Test Loss={test_loss:.4f}, Test Acc={test_acc:.4f}")
+                  f"Train Loss={train_loss:.4f}, Acc={train_acc:.4f} | "
+                  f"Test Loss={test_loss:.4f}, Acc={test_acc:.4f}")
             
             if test_acc > best_test_acc:
                 best_test_acc = test_acc
-                # Save best model
                 os.makedirs(RESULTS_DIR, exist_ok=True)
                 model_path = os.path.join(RESULTS_DIR, f"{scenario_name}_best_model.pth")
                 torch.save(model.state_dict(), model_path)
@@ -243,3 +187,4 @@ def train_final_model(train_dataset, test_dataset, n_features, device, scenario_
     print_metrics(test_metrics)
     
     return model, train_metrics, test_metrics, elapsed_time
+

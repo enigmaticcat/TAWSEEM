@@ -13,7 +13,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from src.config import DATA_PROCESSED_DIR, RESULTS_DIR, TRAIN_RATIO, RANDOM_SEED
 from src.data_preprocessing import preprocess_scenario
-from src.dataset import prepare_datasets
+from src.dataset import prepare_datasets, prepare_profile_datasets
 from src.train import cross_validate, train_final_model
 from src.evaluate import generate_all_plots, plot_accuracy_comparison
 
@@ -34,9 +34,9 @@ def run_scenario(scenario_name, skip_preprocessing=False, skip_cv=False):
     else:
         df = preprocess_scenario(scenario_name)
     
-    # --- Step 2: Prepare PyTorch datasets ---
-    print(f"\nPreparing PyTorch datasets...")
-    train_dataset, test_dataset, scaler, train_profile_ids = prepare_datasets(
+    # --- Step 2: Prepare PyTorch datasets (profile-level) ---
+    print(f"\nPreparing PyTorch datasets (profile-level)...")
+    train_dataset, test_dataset, scaler, train_profile_ids = prepare_profile_datasets(
         df, train_ratio=TRAIN_RATIO, random_seed=RANDOM_SEED
     )
     
