@@ -37,7 +37,7 @@ def run_scenario(scenario_name, skip_preprocessing=False, skip_cv=False):
     
     # --- Step 2: Prepare PyTorch datasets (profile-level) ---
     print(f"\nPreparing PyTorch datasets (profile-level)...")
-    train_dataset, test_dataset, scaler, train_profile_ids = prepare_profile_datasets(
+    train_dataset, test_dataset, scaler, train_profile_ids, cnn_data = prepare_profile_datasets(
         df, train_ratio=TRAIN_RATIO, random_seed=RANDOM_SEED
     )
     
