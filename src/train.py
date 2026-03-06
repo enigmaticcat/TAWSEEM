@@ -100,7 +100,7 @@ def cross_validate(train_dataset, n_features, device, scenario_name, profile_ids
         train_subset = Subset(train_dataset, train_idx)
         val_subset = Subset(train_dataset, val_idx)
         
-        train_loader = DataLoader(train_subset, batch_size=BATCH_SIZE, shuffle=True)
+        train_loader = DataLoader(train_subset, batch_size=BATCH_SIZE, shuffle=True, drop_last=True)
         val_loader = DataLoader(val_subset, batch_size=BATCH_SIZE, shuffle=False)
         
         model = TAWSEEM_MLP(input_dim=n_features).to(device)
@@ -138,7 +138,7 @@ def train_final_model(train_dataset, test_dataset, n_features, device, scenario_
     print(f"Training Final Model")
     print(f"{'='*50}")
     
-    train_loader = DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=True)
+    train_loader = DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=True, drop_last=True)
     test_loader = DataLoader(test_dataset, batch_size=BATCH_SIZE, shuffle=False)
     
     # Create model
