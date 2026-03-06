@@ -135,7 +135,7 @@ def step3_handle_ol_values(df):
     """
     Step 3: Handle Out-of-Ladder (OL) values in Allele columns.
     
-    - Create binary OL indicator columns: OL_ind_1 ... OL_ind_9
+    - Create binary OL indicator columns: OL_ind_1 ... OL_ind_10
     - Replace "OL" with 0 in allele columns
     """
     for i in range(1, MAX_ALLELES + 1):
@@ -194,12 +194,11 @@ def step4_handle_missing_values(df):
     
     total_missing = df[numeric_cols].isna().sum().sum()
     
-    # Fill missing with column mean
+    # Fill missing with 0 (since they represent absence of peaks)
     for col in numeric_cols:
-        col_mean = df[col].mean()
-        df[col] = df[col].fillna(col_mean)
+        df[col] = df[col].fillna(0)
     
-    print(f"  Step 4: Filled {total_missing} missing values with mean, created {n_missing_indicators} missing indicators")
+    print(f"  Step 4: Filled {total_missing} missing values with 0, created {n_missing_indicators} missing indicators")
     return df
 
 
@@ -280,35 +279,23 @@ def step8_create_profile_loci(df):
     return df
 
 
-def step9_balance_dataset(df, target_per_class):
+def step9_balance_dataset(df, target_per_class=None):
     """
-    Step 9: Balance dataset by undersampling to equal profiles per NOC class.
+    Step 9: Report class distribution (NO longer downsamples).
     
-    Samples at the PROFILE level (not row level) to avoid data leakage.
+    Models handle imbalance via class_weight='balanced' instead.
+    Keeping all data gives significantly more training examples.
     """
-    np.random.seed(RANDOM_SEED)
-    
-    # Group profiles by NOC
     profile_noc = df.groupby('Sample File')['NOC'].first()
     
-    balanced_profiles = []
+    print(f"  Step 9: Keeping ALL {len(profile_noc)} profiles (no downsampling)")
     for noc in sorted(profile_noc.unique()):
-        noc_profiles = profile_noc[profile_noc == noc].index.tolist()
-        if len(noc_profiles) < target_per_class:
-            print(f"    WARNING: NOC={noc} only has {len(noc_profiles)} profiles, need {target_per_class}")
-            selected = noc_profiles  # Take all available
-        else:
-            selected = np.random.choice(noc_profiles, size=target_per_class, replace=False).tolist()
-        balanced_profiles.extend(selected)
-        print(f"    NOC={noc}: {len(noc_profiles)} available → {len(selected)} selected")
+        count = (profile_noc == noc).sum()
+        print(f"    NOC={noc}: {count} profiles")
     
-    df = df[df['Sample File'].isin(balanced_profiles)].copy()
-    
-    # Re-create profile_loci after balancing (locus index within each profile)
+    # Re-create profile_loci (locus index within each profile)
     df['profile_loci'] = df.groupby('Sample File').cumcount()
     
-    unique_profiles = df['Sample File'].unique()
-    print(f"  Step 9: Balanced to {len(unique_profiles)} profiles, {len(df)} rows")
     return df
 
 
