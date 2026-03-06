@@ -138,11 +138,28 @@ def _extract_marker_features(row, height_cols, ol_cols, missing_cols):
         std_h = np.std(valid_heights) if len(valid_heights) > 1 else 0
         h_ratio = h1 / (h2 + 1e-6) if h2 > 0 else 0
         h_range = h1 - np.min(valid_heights)
+        
+        # New advanced features:
+        # 1. Stutter ratio (smallest / largest peak)
+        stutter_ratio = np.min(valid_heights) / (h1 + 1e-6)
+        
+        # 2. SNR (Top 2 peaks / Rest of the peaks)
+        top2_h = h1 + h2
+        rest_h = sum_h - top2_h
+        snr_top2 = top2_h / (rest_h + 1e-6)
+        
+        # 3. Log transformations for stability
+        log1p_h1 = np.log1p(h1)
+        log1p_sum_h = np.log1p(sum_h)
     else:
         h1 = h2 = h3 = sum_h = mean_h = std_h = h_ratio = h_range = 0
+        stutter_ratio = snr_top2 = log1p_h1 = log1p_sum_h = 0
     
-    # 11 features per marker
-    return [n_alleles, h1, h2, h3, sum_h, mean_h, std_h, h_ratio, h_range, n_ol, n_missing]
+    # 15 features per marker
+    return [
+        n_alleles, h1, h2, h3, sum_h, mean_h, std_h, h_ratio, h_range, n_ol, n_missing,
+        stutter_ratio, snr_top2, log1p_h1, log1p_sum_h
+    ]
 
 
 def prepare_profile_datasets(df, train_ratio=0.7, random_seed=42):
@@ -176,7 +193,7 @@ def prepare_profile_datasets(df, train_ratio=0.7, random_seed=42):
     ol_cols = [f'OL_ind_{i}' for i in range(1, 11) if f'OL_ind_{i}' in df.columns]
     missing_cols = [f'Missing_Allele_{i}' for i in range(1, 11) if f'Missing_Allele_{i}' in df.columns]
     
-    N_PER_MARKER = 11
+    N_PER_MARKER = 15
     N_AGGREGATE = 10
     
     flat_profiles = []
