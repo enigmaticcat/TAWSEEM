@@ -113,8 +113,9 @@ NUM_DROPOUT_LAYERS = 7
 DROPOUT_RATE = 0.2
 NUM_CLASSES = 5  # NOC: 1, 2, 3, 4, 5
 LEARNING_RATE = 0.001  # Default Adam LR
-EPOCHS = 100
+EPOCHS = 200
 BATCH_SIZE = 30
+EARLY_STOPPING_PATIENCE = 20  # dừng sớm nếu val accuracy không cải thiện sau N epoch
 
 # ============================================================
 # TRAINING PARAMETERS

@@ -16,7 +16,7 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from src.config import (
     EPOCHS, BATCH_SIZE, LEARNING_RATE, NUM_CV_FOLDS, 
-    RANDOM_SEED, RESULTS_DIR,
+    RANDOM_SEED, RESULTS_DIR, EARLY_STOPPING_PATIENCE,
 )
 from src.model import TAWSEEM_MLP
 from src.evaluate import compute_metrics, print_metrics
@@ -107,18 +107,32 @@ def cross_validate(train_dataset, n_features, device, scenario_name, profile_ids
         criterion = nn.CrossEntropyLoss()
         optimizer = torch.optim.Adam(model.parameters(), lr=LEARNING_RATE, weight_decay=1e-4)
         
+        best_val_acc = 0
+        patience_counter = 0
+
         for epoch in range(EPOCHS):
             train_loss, train_acc = train_one_epoch(model, train_loader, criterion, optimizer, device)
-            
+            val_loss, val_acc, _, _ = evaluate(model, val_loader, criterion, device)
+
+            # Early stopping
+            if val_acc > best_val_acc:
+                best_val_acc = val_acc
+                patience_counter = 0
+            else:
+                patience_counter += 1
+
             if (epoch + 1) % 20 == 0 or epoch == 0:
-                val_loss, val_acc, _, _ = evaluate(model, val_loader, criterion, device)
                 print(f"  Epoch {epoch+1:3d}/{EPOCHS}: "
                       f"Train Loss={train_loss:.4f}, Acc={train_acc:.4f} | "
-                      f"Val Loss={val_loss:.4f}, Acc={val_acc:.4f}")
-        
-        _, val_acc, _, _ = evaluate(model, val_loader, criterion, device)
-        fold_accuracies.append(val_acc)
-        print(f"  Fold {fold + 1} Final Accuracy: {val_acc:.4f}")
+                      f"Val Loss={val_loss:.4f}, Acc={val_acc:.4f} "
+                      f"[patience {patience_counter}/{EARLY_STOPPING_PATIENCE}]")
+
+            if patience_counter >= EARLY_STOPPING_PATIENCE:
+                print(f"  Early stopping at epoch {epoch+1} (best val acc: {best_val_acc:.4f})")
+                break
+
+        fold_accuracies.append(best_val_acc)
+        print(f"  Fold {fold + 1} Best Val Accuracy: {best_val_acc:.4f}")
     
     mean_acc = np.mean(fold_accuracies)
     std_acc = np.std(fold_accuracies)
@@ -151,20 +165,31 @@ def train_final_model(train_dataset, test_dataset, n_features, device, scenario_
     start_time = time.time()
     
     best_test_acc = 0
+    patience_counter = 0
+    model_path = os.path.join(RESULTS_DIR, f"{scenario_name}_best_model.pth")
+    os.makedirs(RESULTS_DIR, exist_ok=True)
+
     for epoch in range(EPOCHS):
         train_loss, train_acc = train_one_epoch(model, train_loader, criterion, optimizer, device)
-        
+        test_loss, test_acc, _, _ = evaluate(model, test_loader, criterion, device)
+
+        # Save best model & early stopping
+        if test_acc > best_test_acc:
+            best_test_acc = test_acc
+            patience_counter = 0
+            torch.save(model.state_dict(), model_path)
+        else:
+            patience_counter += 1
+
         if (epoch + 1) % 10 == 0 or epoch == 0:
-            test_loss, test_acc, _, _ = evaluate(model, test_loader, criterion, device)
             print(f"  Epoch {epoch+1:3d}/{EPOCHS}: "
                   f"Train Loss={train_loss:.4f}, Acc={train_acc:.4f} | "
-                  f"Test Loss={test_loss:.4f}, Acc={test_acc:.4f}")
-            
-            if test_acc > best_test_acc:
-                best_test_acc = test_acc
-                os.makedirs(RESULTS_DIR, exist_ok=True)
-                model_path = os.path.join(RESULTS_DIR, f"{scenario_name}_best_model.pth")
-                torch.save(model.state_dict(), model_path)
+                  f"Test Loss={test_loss:.4f}, Acc={test_acc:.4f} "
+                  f"[patience {patience_counter}/{EARLY_STOPPING_PATIENCE}]")
+
+        if patience_counter >= EARLY_STOPPING_PATIENCE:
+            print(f"\n  Early stopping at epoch {epoch+1} (best test acc: {best_test_acc:.4f})")
+            break
     
     elapsed_time = time.time() - start_time
     print(f"\nTraining completed in {elapsed_time:.1f} seconds")
