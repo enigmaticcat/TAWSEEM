@@ -22,6 +22,41 @@ from src.model import TAWSEEM_MLP
 from src.evaluate import compute_metrics, print_metrics
 
 
+class FocalLoss(nn.Module):
+    """
+    Focal Loss: FL(pt) = -αt * (1 - pt)^γ * log(pt)
+    
+    Đầy là tiêu chuẩn tốt hơn CrossEntropyLoss cho dữ liệu mất cân bằng cực đoan.
+    - γ (gamma): tập trung vào hard examples. γ=2 là giá trị phổ biến.
+    - alpha (class weights): đư ợc truyền từ class_weights dict.
+    """
+    def __init__(self, alpha=None, gamma=2.0, reduction='mean'):
+        super().__init__()
+        self.gamma = gamma
+        self.reduction = reduction
+        self.alpha = alpha  # Tensor [n_classes]
+
+    def forward(self, inputs, targets):
+        # inputs: (N, C), targets: (N,)
+        log_pt = nn.functional.log_softmax(inputs, dim=1)
+        log_pt = log_pt.gather(1, targets.unsqueeze(1)).squeeze(1)  # (N,)
+        pt = log_pt.exp()
+
+        focal_weight = (1 - pt) ** self.gamma
+
+        if self.alpha is not None:
+            alpha_t = self.alpha[targets]
+            focal_weight = alpha_t * focal_weight
+
+        loss = -focal_weight * log_pt
+
+        if self.reduction == 'mean':
+            return loss.mean()
+        elif self.reduction == 'sum':
+            return loss.sum()
+        return loss
+
+
 def train_one_epoch(model, dataloader, criterion, optimizer, device):
     """Train for one epoch. Returns average loss."""
     model.train()
@@ -114,7 +149,7 @@ def cross_validate(train_dataset, n_features, device, scenario_name, profile_ids
         val_loader = DataLoader(val_subset, batch_size=BATCH_SIZE, shuffle=False)
         
         model = TAWSEEM_MLP(input_dim=n_features).to(device)
-        criterion = nn.CrossEntropyLoss(weight=weight_tensor)
+        criterion = FocalLoss(alpha=alpha_tensor, gamma=2.0)
         optimizer = torch.optim.Adam(model.parameters(), lr=LEARNING_RATE, weight_decay=1e-4)
         
         best_val_acc = 0
@@ -162,15 +197,15 @@ def train_final_model(train_dataset, test_dataset, n_features, device, scenario_
     print(f"Training Final Model")
     print(f"{'='*50}")
 
-    # Build class weight tensor (NOC 1-5 → index 0-4)
+    # Build Focal Loss với class weights (NOC 1-5 → index 0-4)
     if class_weights is not None:
-        weight_tensor = torch.tensor(
+        alpha_tensor = torch.tensor(
             [class_weights.get(i + 1, 1.0) for i in range(5)],
             dtype=torch.float32
         ).to(device)
-        print(f"  Class weights: {[f'{class_weights.get(i+1, 1.0):.3f}' for i in range(5)]}")
+        print(f"  Focal Loss alpha: {[f'{class_weights.get(i+1, 1.0):.3f}' for i in range(5)]}")
     else:
-        weight_tensor = None
+        alpha_tensor = None
     
     train_loader = DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=True, drop_last=True)
     test_loader = DataLoader(test_dataset, batch_size=BATCH_SIZE, shuffle=False)
@@ -179,7 +214,7 @@ def train_final_model(train_dataset, test_dataset, n_features, device, scenario_
     model = TAWSEEM_MLP(input_dim=n_features).to(device)
     model.summary()
     
-    criterion = nn.CrossEntropyLoss(weight=weight_tensor)
+    criterion = FocalLoss(alpha=alpha_tensor, gamma=2.0)
     optimizer = torch.optim.Adam(model.parameters(), lr=LEARNING_RATE, weight_decay=1e-4)
     
     start_time = time.time()

@@ -281,21 +281,43 @@ def step8_create_profile_loci(df):
 
 def step9_balance_dataset(df, target_per_class=None):
     """
-    Step 9: Report class distribution (NO longer downsamples).
-    
-    Models handle imbalance via class_weight='balanced' instead.
-    Keeping all data gives significantly more training examples.
+    Step 9: Downsample class 1 (1-Person) to MAX_PROFILES_CLASS1.
+
+    Class 1 thường có số lượng mẫu lớn hơn rất nhiều so với các class khác.
+    Giới hạn 1-Person ở MAX_PROFILES_CLASS1 profiles để giảm imbalance,
+    nhưng vẫn giữ nguyên toàn bộ 2-5 Person.
     """
+    from src.config import MAX_PROFILES_CLASS1
+
     profile_noc = df.groupby('Sample File')['NOC'].first()
-    
-    print(f"  Step 9: Keeping ALL {len(profile_noc)} profiles (no downsampling)")
+
+    print(f"  Step 9: Class distribution trước khi downsample:")
     for noc in sorted(profile_noc.unique()):
         count = (profile_noc == noc).sum()
         print(f"    NOC={noc}: {count} profiles")
-    
-    # Re-create profile_loci (locus index within each profile)
+
+    # Downsample chỉ class 1-Person
+    class1_profiles = profile_noc[profile_noc == 1].index.tolist()
+    if len(class1_profiles) > MAX_PROFILES_CLASS1:
+        import numpy as np
+        rng = np.random.default_rng(42)
+        keep_class1 = rng.choice(class1_profiles, size=MAX_PROFILES_CLASS1, replace=False).tolist()
+        other_profiles = profile_noc[profile_noc != 1].index.tolist()
+        keep_profiles = set(keep_class1 + other_profiles)
+        df = df[df['Sample File'].isin(keep_profiles)].copy()
+        print(f"\n  Downsampled 1-Person: {len(class1_profiles)} → {MAX_PROFILES_CLASS1} profiles")
+    else:
+        print(f"\n  1-Person ({len(class1_profiles)}) <= MAX_PROFILES_CLASS1 ({MAX_PROFILES_CLASS1}), không downsample")
+
+    # Re-create profile_loci
     df['profile_loci'] = df.groupby('Sample File').cumcount()
-    
+
+    profile_noc_after = df.groupby('Sample File')['NOC'].first()
+    print(f"  Class distribution sau khi downsample:")
+    for noc in sorted(profile_noc_after.unique()):
+        count = (profile_noc_after == noc).sum()
+        print(f"    NOC={noc}: {count} profiles")
+
     return df
 
 

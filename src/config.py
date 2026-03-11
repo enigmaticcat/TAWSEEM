@@ -116,6 +116,7 @@ LEARNING_RATE = 0.001  # Default Adam LR
 EPOCHS = 200
 BATCH_SIZE = 30
 EARLY_STOPPING_PATIENCE = 20  # dừng sớm nếu val accuracy không cải thiện sau N epoch
+MAX_PROFILES_CLASS1 = 300    # giới hạn 1-Person tối đa 300 profile để giảm imbalance
 
 # ============================================================
 # TRAINING PARAMETERS
