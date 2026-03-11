@@ -123,15 +123,15 @@ def cross_validate(train_dataset, n_features, device, scenario_name, profile_ids
     print(f"5-Fold Cross-Validation")
     print(f"{'='*50}")
 
-    # Build class weight tensor (NOC 1-5 → index 0-4)
+    # Build Focal Loss alpha (NOC 1-5 → index 0-4)
     if class_weights is not None:
-        weight_tensor = torch.tensor(
+        alpha_tensor = torch.tensor(
             [class_weights.get(i + 1, 1.0) for i in range(5)],
             dtype=torch.float32
         ).to(device)
-        print(f"  Class weights: {[f'{class_weights.get(i+1, 1.0):.3f}' for i in range(5)]}")
+        print(f"  Focal Loss alpha: {[f'{class_weights.get(i+1, 1.0):.3f}' for i in range(5)]}")
     else:
-        weight_tensor = None
+        alpha_tensor = None
     
     labels = train_dataset.labels.numpy()
     fold_accuracies = []
