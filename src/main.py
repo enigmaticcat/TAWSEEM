@@ -49,16 +49,20 @@ def run_scenario(scenario_name, skip_preprocessing=False, skip_cv=False):
                           'cpu')
     print(f"Using device: {device}")
     
+    _, _, y_train_raw, _, class_weights = cnn_data
+
     # --- Step 4: Cross-validation (MLP) ---
     if not skip_cv:
         cv_accuracies = cross_validate(
             train_dataset, n_features, device, scenario_name,
-            profile_ids=train_profile_ids
+            profile_ids=train_profile_ids,
+            class_weights=class_weights,
         )
     
     # --- Step 5: Train final MLP model ---
     model, train_metrics, test_metrics, elapsed = train_final_model(
-        train_dataset, test_dataset, n_features, device, scenario_name
+        train_dataset, test_dataset, n_features, device, scenario_name,
+        class_weights=class_weights,
     )
     
     # --- Step 6: Train tree-based models (RF + XGBoost) ---

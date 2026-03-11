@@ -78,7 +78,7 @@ def evaluate(model, dataloader, criterion, device):
     return avg_loss, accuracy, all_preds, all_labels
 
 
-def cross_validate(train_dataset, n_features, device, scenario_name, profile_ids=None):
+def cross_validate(train_dataset, n_features, device, scenario_name, profile_ids=None, class_weights=None):
     """
     Perform 5-fold cross-validation.
     
@@ -87,6 +87,16 @@ def cross_validate(train_dataset, n_features, device, scenario_name, profile_ids
     print(f"\n{'='*50}")
     print(f"5-Fold Cross-Validation")
     print(f"{'='*50}")
+
+    # Build class weight tensor (NOC 1-5 → index 0-4)
+    if class_weights is not None:
+        weight_tensor = torch.tensor(
+            [class_weights.get(i + 1, 1.0) for i in range(5)],
+            dtype=torch.float32
+        ).to(device)
+        print(f"  Class weights: {[f'{class_weights.get(i+1, 1.0):.3f}' for i in range(5)]}")
+    else:
+        weight_tensor = None
     
     labels = train_dataset.labels.numpy()
     fold_accuracies = []
@@ -104,7 +114,7 @@ def cross_validate(train_dataset, n_features, device, scenario_name, profile_ids
         val_loader = DataLoader(val_subset, batch_size=BATCH_SIZE, shuffle=False)
         
         model = TAWSEEM_MLP(input_dim=n_features).to(device)
-        criterion = nn.CrossEntropyLoss()
+        criterion = nn.CrossEntropyLoss(weight=weight_tensor)
         optimizer = torch.optim.Adam(model.parameters(), lr=LEARNING_RATE, weight_decay=1e-4)
         
         best_val_acc = 0
@@ -142,7 +152,7 @@ def cross_validate(train_dataset, n_features, device, scenario_name, profile_ids
     return fold_accuracies
 
 
-def train_final_model(train_dataset, test_dataset, n_features, device, scenario_name):
+def train_final_model(train_dataset, test_dataset, n_features, device, scenario_name, class_weights=None):
     """
     Train the final model on the full training set and evaluate on test set.
     
@@ -151,6 +161,16 @@ def train_final_model(train_dataset, test_dataset, n_features, device, scenario_
     print(f"\n{'='*50}")
     print(f"Training Final Model")
     print(f"{'='*50}")
+
+    # Build class weight tensor (NOC 1-5 → index 0-4)
+    if class_weights is not None:
+        weight_tensor = torch.tensor(
+            [class_weights.get(i + 1, 1.0) for i in range(5)],
+            dtype=torch.float32
+        ).to(device)
+        print(f"  Class weights: {[f'{class_weights.get(i+1, 1.0):.3f}' for i in range(5)]}")
+    else:
+        weight_tensor = None
     
     train_loader = DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=True, drop_last=True)
     test_loader = DataLoader(test_dataset, batch_size=BATCH_SIZE, shuffle=False)
@@ -159,7 +179,7 @@ def train_final_model(train_dataset, test_dataset, n_features, device, scenario_
     model = TAWSEEM_MLP(input_dim=n_features).to(device)
     model.summary()
     
-    criterion = nn.CrossEntropyLoss()
+    criterion = nn.CrossEntropyLoss(weight=weight_tensor)
     optimizer = torch.optim.Adam(model.parameters(), lr=LEARNING_RATE, weight_decay=1e-4)
     
     start_time = time.time()

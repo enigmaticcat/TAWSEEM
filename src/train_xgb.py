@@ -71,6 +71,16 @@ def run_xgb_scenario(scenario_name: str, skip_preprocessing: bool = False):
     X_test  = test_dataset.features.numpy()
     y_test  = test_dataset.labels.numpy()
 
+    _, _, y_train_raw, _, class_weights = cnn_data
+
+    # Compute per-sample weights for XGBoost
+    # y_train is 0-4 (shifted), class_weights keys are 1-5
+    sample_weight = np.array(
+        [class_weights.get(int(y) + 1, 1.0) for y in y_train],
+        dtype=np.float32
+    )
+    print(f"  Class weights: { {k: f'{v:.3f}' for k, v in sorted(class_weights.items())} }")
+
     print(f"  Train: {X_train.shape[0]} profiles × {X_train.shape[1]} features")
     print(f"  Test:  {X_test.shape[0]} profiles × {X_test.shape[1]} features")
 
@@ -79,7 +89,10 @@ def run_xgb_scenario(scenario_name: str, skip_preprocessing: bool = False):
     skf = StratifiedKFold(n_splits=NUM_CV_FOLDS, shuffle=True, random_state=RANDOM_SEED)
 
     cv_start = time.time()
-    cv_scores = cross_val_score(model, X_train, y_train, cv=skf, scoring="accuracy")
+    cv_scores = cross_val_score(
+        model, X_train, y_train, cv=skf, scoring="accuracy",
+        fit_params={"sample_weight": sample_weight},
+    )
     cv_time = time.time() - cv_start
 
     print(f"  CV Accuracy : {cv_scores.mean():.4f} ± {cv_scores.std():.4f}")
@@ -88,7 +101,7 @@ def run_xgb_scenario(scenario_name: str, skip_preprocessing: bool = False):
 
     print(f"\n[4/4] Training final XGBoost on full train set...")
     train_start = time.time()
-    model.fit(X_train, y_train)
+    model.fit(X_train, y_train, sample_weight=sample_weight)
     elapsed = time.time() - train_start
 
     train_preds = model.predict(X_train)
