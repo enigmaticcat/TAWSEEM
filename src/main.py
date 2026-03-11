@@ -1,8 +1,3 @@
-"""
-TAWSEEM: Main Entry Point
-Run the full pipeline: preprocess → train (with CV) → evaluate → plot.
-"""
-
 import os
 import sys
 import argparse
